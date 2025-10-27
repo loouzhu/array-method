@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JavaScript数组操作方法演示</title>
+  <link rel="stylesheet" href="./index.css">
+</head>
+
+<body>
+  <div class="container">
+    <h1>JavaScript数组操作方法演示</h1>
+
+    <div class="card">
+      <h2>初始数组设置</h2>
+      <div class="input-section">
+        <input type="text" id="arrayInput" placeholder="输入数组元素，用逗号分隔 (例如: 1,2,3,4,5)" value="1,2,3,4,5">
+        <button id="setArrayBtn">设置数组</button>
+      </div>
+      <div class="array-display" id="originalArray">[1, 2, 3, 4, 5]</div>
+    </div>
+
+    <div class="card">
+      <h2>数组操作方法</h2>
+      <div class="operations">
+        <button class="operation-btn" data-method="push">push()</button>
+        <button class="operation-btn" data-method="pop">pop()</button>
+        <button class="operation-btn" data-method="shift">shift()</button>
+        <button class="operation-btn" data-method="unshift">unshift()</button>
+        <button class="operation-btn" data-method="splice">splice()</button>
+        <button class="operation-btn" data-method="slice">slice()</button>
+        <button class="operation-btn" data-method="concat">concat()</button>
+        <button class="operation-btn" data-method="join">join()</button>
+        <button class="operation-btn" data-method="filter">filter()</button>
+        <button class="operation-btn" data-method="sort">sort()</button>
+        <button class="operation-btn" data-method="map">map()</button>
+        <button class="operation-btn" data-method="forEach">forEach()</button>
+        <button class="operation-btn" data-method="reduce">reduce()</button>
+      </div>
+
+      <div class="input-section" id="methodInput" style="display: none;">
+        <input type="text" id="paramInput" placeholder="输入参数">
+        <button id="executeBtn">执行</button>
+      </div>
+
+      <div class="result-section">
+        <h3>操作结果:</h3>
+        <div class="show-result">
+          <div id="result"></div>
+          <div class="code-example" id="codeExample"></div>
+          <div class="explanation" id="explanation"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card call-section">
+      <h2>call() 方法演示</h2>
+      <p>call() 方法使用一个指定的 this 值和单独给出的一个或多个参数来调用一个函数。</p>
+      <br>
+      <p>call() 方法一般用来修改this的指向</p>
+      <div class="result-section">
+        <div id="callResult"></div>
+        <div class="code-example" id="callCodeExample"></div>
+      </div>
+    </div>
+  </div>
+  <script src="./index.js" defer></script>
+</body>
+
+</html>
