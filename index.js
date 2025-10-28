@@ -46,7 +46,7 @@ function getPlaceholder(method) {
   switch (method) {
     case "push":
     case "unshift":
-      return "输入要添加的元素，多个用逗号分隔";
+      return "输入要添加的元素，多个用逗号分隔，默认添加0";
     case "splice":
       return '格式: 起始索引,删除个数,添加元素 (例如: 1,2,"a","b")';
     case "slice":
@@ -58,9 +58,14 @@ function getPlaceholder(method) {
     case "filter":
       return "输入条件，如 x=>x>2";
     case "map":
-      return "输入映射函数，如 x=>x*2";
+      return "输入映射函数，默认 x=>x";
     case "reduce":
       return "输入归约函数，如 (acc,cur)=>acc+cur";
+    case "pop":
+    case "shift":
+    case "sort":
+    case "forEach":
+      return "请勿输入任何参数，调整好数组后直接执行";
     default:
       return "输入参数";
   }
@@ -69,7 +74,6 @@ function getPlaceholder(method) {
 // 执行数组方法
 function executeMethod() {
   const param = paramInput.value.trim();
-  if (!param) return alert("请输入要执行的元素");
   let newArray, returnValue, explanationText, codeText;
 
   // 保存原始数组用于显示
@@ -182,19 +186,69 @@ function executeMethod() {
         break;
 
       case "concat":
-        const concatItems = param.split(",").map((item) => {
-          const trimmed = item.trim();
-          return isNaN(trimmed) ? trimmed : Number(trimmed);
-        });
-        newArray = myArray.concat(concatItems);
+        // 解析输入参数
+        const concatItems = [];
+        const items = param.split(",");
+
+        for (let i = 0; i < items.length; i++) {
+          let trimmed = items[i].trim();
+
+          // 处理数组形式的输入 [x,y,z]
+          if (trimmed.startsWith("[") && !trimmed.endsWith("]")) {
+            // 开始一个数组，合并后续元素直到找到结束的 ]
+            let arrayContent = trimmed.slice(1); // 去掉开头的 [
+            while (i < items.length - 1 && !trimmed.endsWith("]")) {
+              i++;
+              trimmed = items[i].trim();
+              arrayContent += "," + trimmed;
+            }
+
+            if (arrayContent.endsWith("]")) {
+              arrayContent = arrayContent.slice(0, -1); // 去掉结尾的 ]
+            }
+
+            // 解析数组内容
+            const parsedArray = arrayContent.split(",").map((item) => {
+              const trimmedItem = item.trim();
+              return isNaN(trimmedItem) ? trimmedItem : Number(trimmedItem);
+            });
+
+            concatItems.push(parsedArray);
+          } else if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            // 单个数组元素 [x,y,z]
+            const arrayContent = trimmed.slice(1, -1); // 去掉 [ 和 ]
+            const parsedArray = arrayContent.split(",").map((item) => {
+              const trimmedItem = item.trim();
+              return isNaN(trimmedItem) ? trimmedItem : Number(trimmedItem);
+            });
+            concatItems.push(parsedArray);
+          } else {
+            // 普通元素
+            concatItems.push(isNaN(trimmed) ? trimmed : Number(trimmed));
+          }
+        }
+
+        // 使用展开运算符处理嵌套数组
+        newArray = myArray.concat(...concatItems);
         returnValue = newArray;
+
+        // 生成代码示例
+        const concatItemsForDisplay = concatItems.map((item) => {
+          if (Array.isArray(item)) {
+            return `[${item
+              .map((inner) =>
+                typeof inner === "string" ? `"${inner}"` : inner
+              )
+              .join(", ")}]`;
+          }
+          return typeof item === "string" ? `"${item}"` : item;
+        });
+
         explanationText = `concat() 方法用于合并两个或多个数组。此方法不会更改现有数组，而是返回一个新数组。`;
         codeText = `let arr = ${JSON.stringify(originalArrayCopy)};
-            let concatenated = arr.concat([${concatItems
-              .map((item) => (typeof item === "string" ? `"${item}"` : item))
-              .join(", ")}]);
-            // concatenated 是 ${JSON.stringify(newArray)}
-            // 原数组 arr 保持不变: ${JSON.stringify(myArray)}`;
+          let concatenated = arr.concat(${concatItemsForDisplay.join(", ")});
+          // concatenated 是 ${JSON.stringify(newArray)}
+          // 原数组 arr 保持不变: ${JSON.stringify(myArray)}`;
         codeExample.style.whiteSpace = "pre-wrap";
         break;
 
@@ -240,7 +294,7 @@ function executeMethod() {
         break;
 
       case "map":
-        const mapFunc = param || "x => x * 2";
+        const mapFunc = param || "x=>x";
         const mapFunction = new Function("return " + mapFunc)();
         newArray = myArray.map(mapFunction);
         returnValue = newArray;
@@ -347,3 +401,25 @@ executeBtn.addEventListener("click", executeMethod);
 // 初始化
 setArray();
 demonstrateCall();
+
+// 初始化弹窗
+document.addEventListener("DOMContentLoaded", function () {
+  const overlay = document.getElementById("overlay");
+  const startBtn = document.getElementById("startBtn");
+  const mainContainer = document.getElementById("mainContainer");
+
+  // 点击"开始使用"按钮
+  startBtn.addEventListener("click", function () {
+    // 隐藏弹窗
+    overlay.style.display = "none";
+    // 启用页面内容
+    mainContainer.classList.remove("disabled");
+  });
+
+  // 阻止点击弹窗背景关闭
+  overlay.addEventListener("click", function (e) {
+    if (e.target === overlay) {
+      e.stopPropagation();
+    }
+  });
+});
