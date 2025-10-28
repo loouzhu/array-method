@@ -31,6 +31,7 @@ function setArray() {
   result.innerHTML = "";
   codeExample.textContent = "";
   explanation.textContent = "";
+  paramInput.value = "";
 }
 
 // 显示方法输入框
@@ -65,8 +66,9 @@ function getPlaceholder(method) {
       return "格式：函数，默认(a, b) => a - b";
     case "pop":
     case "shift":
-    case "forEach":
       return "请勿输入任何参数，调整好数组后直接执行";
+    case "forEach":
+      return "输入映射函数，默认 x=>x";
     default:
       return "输入参数";
   }
@@ -417,21 +419,36 @@ ${sortCode};
         break;
 
       case "forEach":
-        const forEachFunc = param || "x => console.log(x)";
+        const forEachFunc =
+          param || "(item, index) => console.log(`${index}:${item}`)";
         const forEachFunction = new Function("return " + forEachFunc)();
-        let forEachResult = [];
+
+        // 收集执行结果用于显示
+        let forEachOutput = [];
         myArray.forEach((item, index) => {
-          forEachResult.push(forEachFunction(item, index, myArray));
+          const result = forEachFunction(item, index, myArray);
+          forEachOutput.push(
+            `索引 ${index}: 值 ${item} ${
+              result !== undefined
+                ? `→ 函数返回: ${JSON.stringify(result)}`
+                : ""
+            }`
+          );
         });
+
         newArray = [...myArray];
-        returnValue = forEachResult;
-        explanationText = `forEach() 方法对数组的每个元素执行一次给定的函数。`;
-        codeText = `
-              let arr = ${JSON.stringify(originalArrayCopy)};
-              let results = [];
-              arr.forEach(${forEachFunc});
-              // 原数组 arr 保持不变: ${JSON.stringify(myArray)}
-            `;
+        returnValue = undefined;
+        explanationText = `forEach() 方法对数组的每个元素执行一次给定的函数，返回值为 undefined。`;
+
+        codeText = `let arr = ${JSON.stringify(originalArrayCopy)};
+        // 使用 forEach 遍历数组
+        arr.forEach(${forEachFunc});
+        // 执行过程:
+        ${forEachOutput.map((line) => `// ${line}`).join("\n")}
+        // 原数组 arr 保持不变: ${JSON.stringify(myArray)}
+        // forEach() 返回: undefined
+        `;
+
         codeExample.style.whiteSpace = "pre-wrap";
         break;
 
