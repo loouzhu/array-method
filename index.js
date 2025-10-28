@@ -61,9 +61,10 @@ function getPlaceholder(method) {
       return "输入映射函数，默认 x=>x";
     case "reduce":
       return "格式: 函数,[初始值] 默认(acc,cur)=>acc+cur,0";
+    case "sort":
+      return "格式：函数，默认(a, b) => a - b";
     case "pop":
     case "shift":
-    case "sort":
     case "forEach":
       return "请勿输入任何参数，调整好数组后直接执行";
     default:
@@ -345,18 +346,59 @@ function executeMethod() {
         break;
 
       case "sort":
+        newArray = [...myArray];
+
         if (param) {
-          const sortFunc = new Function("return " + param)();
-          newArray = [...myArray].sort(sortFunc);
+          try {
+            // 检测参数类型
+            const trimmedParam = param.trim();
+
+            // 判断是否为函数表达式
+            const isFunctionExpression =
+              trimmedParam.startsWith("(") ||
+              trimmedParam.startsWith("function") ||
+              trimmedParam.includes("=>") ||
+              trimmedParam.includes("return");
+
+            if (isFunctionExpression) {
+              // 使用更安全的方式执行函数
+              let sortFunc;
+              if (trimmedParam.includes("=>")) {
+                // 箭头函数
+                sortFunc = eval(`(${trimmedParam})`);
+              } else {
+                // 普通函数
+                sortFunc = new Function("return " + trimmedParam)();
+              }
+
+              if (typeof sortFunc === "function") {
+                newArray.sort(sortFunc);
+              } else {
+                throw new Error("Parameter is not a function");
+              }
+            } else {
+              // 简单字符串参数
+              newArray.sort();
+            }
+          } catch (error) {
+            console.warn("Sort function error, using default sort:", error);
+            newArray.sort();
+          }
         } else {
-          newArray = [...myArray].sort();
+          newArray.sort();
         }
+
         returnValue = newArray;
-        explanationText = `sort() 方法用原地算法对数组的元素进行排序，并返回数组。`;
-        codeText = `let arr = ${JSON.stringify(originalArrayCopy)};
-          let sorted = arr.sort(${param || ""});
-          // sorted 是 ${JSON.stringify(newArray)}
-          // 注意: sort() 会改变原数组，这里为了演示使用了副本`;
+        explanationText = `sort() 方法对数组元素进行排序。${
+          param ? "使用了自定义比较函数。" : "使用默认字典序排序。"
+        }`;
+
+        // 动态生成代码示例
+        const sortCode = param ? `arr.sort(${param})` : "arr.sort()";
+        codeText = `// 原数组: ${JSON.stringify(originalArrayCopy)}
+${sortCode};
+// 排序后: ${JSON.stringify(newArray)}
+// 注意: sort() 会修改原数组`;
         codeExample.style.whiteSpace = "pre-wrap";
         break;
 
@@ -600,7 +642,7 @@ function demonstrateCall() {
     arrayLike 现在是 {0: 'a', 1: 'b', 2: 'c', 3: 'd', length: 4}
     newLength 是 4
 
-    
+
     // 使用call()修改this指向的例子
     const person = {
       name: 'Alice',
