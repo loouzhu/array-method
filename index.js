@@ -60,7 +60,7 @@ function getPlaceholder(method) {
     case "map":
       return "输入映射函数，默认 x=>x";
     case "reduce":
-      return "输入归约函数，如 (acc,cur)=>acc+cur";
+      return "格式: 函数,[初始值] 默认(acc,cur)=>acc+cur,0";
     case "pop":
     case "shift":
     case "sort":
@@ -140,29 +140,96 @@ function executeMethod() {
         break;
 
       case "splice":
-        const spliceParams = param.split(",").map((item) => {
-          const trimmed = item.trim();
-          return isNaN(trimmed) ? trimmed : Number(trimmed);
-        });
-        const start = spliceParams[0];
-        const deleteCount = spliceParams[1] || 0;
-        const addItems = spliceParams.slice(2);
+        try {
+          const spliceParams = param
+            .split(",")
+            .map((item) => {
+              const trimmed = item.trim();
+              // 检查是否是数字（包括负数）
+              if (trimmed === "") return undefined; // 空字符串返回 undefined
+              const num = Number(trimmed);
+              return isNaN(num) ? trimmed : num;
+            })
+            .filter((item) => item !== undefined); // 过滤掉空参数
 
-        returnValue = myArray.splice(start, deleteCount, ...addItems);
-        newArray = [...myArray];
-        explanationText = `splice() 方法通过删除或替换现有元素或者原地添加新的元素来修改数组。`;
-        codeText = `let arr = ${JSON.stringify(originalArrayCopy)};
-          let removed = arr.splice(${start}, ${deleteCount}${
-          addItems.length > 0
-            ? ", " +
-              addItems
-                .map((item) => (typeof item === "string" ? `"${item}"` : item))
-                .join(", ")
-            : ""
-        });
-          arr 现在是 ${JSON.stringify(newArray)}
-          removed 是 ${JSON.stringify(returnValue)}`;
-        codeExample.style.whiteSpace = "pre-wrap";
+          // 参数验证
+          if (spliceParams.length === 0) {
+            throw new Error("至少需要提供起始索引");
+          }
+
+          const start = spliceParams[0];
+          const deleteCount =
+            spliceParams[1] !== undefined ? spliceParams[1] : 0;
+          const addItems = spliceParams.slice(2);
+
+          // 验证起始索引
+          if (typeof start !== "number") {
+            throw new Error("起始索引必须是数字");
+          }
+
+          // 验证删除数量
+          if (typeof deleteCount !== "number" || deleteCount < 0) {
+            throw new Error("删除数量必须是非负数字");
+          }
+
+          // 处理边界情况
+          let adjustedStart = start;
+          if (start < 0) {
+            adjustedStart = Math.max(myArray.length + start, 0);
+          } else if (start > myArray.length) {
+            adjustedStart = myArray.length;
+          }
+
+          let adjustedDeleteCount = deleteCount;
+          if (adjustedStart + deleteCount > myArray.length) {
+            adjustedDeleteCount = myArray.length - adjustedStart;
+          }
+
+          // 执行 splice 操作
+          returnValue = myArray.splice(
+            adjustedStart,
+            adjustedDeleteCount,
+            ...addItems
+          );
+          newArray = [...myArray];
+
+          explanationText = `splice() 方法通过删除或替换现有元素或者原地添加新的元素来修改数组。`;
+
+          // 生成代码示例
+          const addItemsDisplay = addItems.map((item) =>
+            typeof item === "string" ? `"${item}"` : item
+          );
+
+          let codeParams = `${adjustedStart}, ${adjustedDeleteCount}`;
+          if (addItemsDisplay.length > 0) {
+            codeParams += `, ${addItemsDisplay.join(", ")}`;
+          }
+
+          codeText = `let arr = ${JSON.stringify(originalArrayCopy)};
+        let removed = arr.splice(${codeParams});
+        // arr 现在是 ${JSON.stringify(newArray)}
+        // removed 是 ${JSON.stringify(returnValue)}`;
+
+          codeExample.style.whiteSpace = "pre-wrap";
+        } catch (error) {
+          result.innerHTML = `<div style="color: red;">splice 错误: ${error.message}</div>
+        <div style="margin-top: 10px; color: #666;">正确使用格式:</div>
+        <ul style="color: #666; margin-left: 20px;">
+            <li><strong>删除元素:</strong> 起始索引,删除个数</li>
+            <li><strong>添加元素:</strong> 起始索引,0,元素1,元素2,...</li>
+            <li><strong>替换元素:</strong> 起始索引,删除个数,新元素1,新元素2,...</li>
+        </ul>
+        <div style="margin-top: 10px; color: #666;">示例:</div>
+        <ul style="color: #666; margin-left: 20px;">
+            <li>1,2 → 从索引1开始删除2个元素</li>
+            <li>1,0,"a","b" → 在索引1处插入"a"和"b"</li>
+            <li>1,2,"x","y" → 从索引1开始删除2个元素，并插入"x"和"y"</li>
+            <li>-2,1 → 从倒数第2个位置删除1个元素</li>
+        </ul>`;
+          codeExample.textContent = "";
+          explanation.textContent = "";
+          return;
+        }
         break;
 
       case "slice":
@@ -327,16 +394,159 @@ function executeMethod() {
         break;
 
       case "reduce":
-        const reduceFunc = param || "(acc, cur) => acc + cur";
-        const reduceFunction = new Function("return " + reduceFunc)();
-        returnValue = myArray.reduce(reduceFunction);
-        newArray = [...myArray];
-        explanationText = `reduce() 方法对数组中的每个元素执行一个由您提供的reducer函数(升序执行)，将其结果汇总为单个返回值。`;
-        codeText = `let arr = ${JSON.stringify(originalArrayCopy)};
-            let reduced = arr.reduce(${reduceFunc});
-            // reduced 是 ${JSON.stringify(returnValue)}
-            // 原数组 arr 保持不变: ${JSON.stringify(myArray)}`;
-        codeExample.style.whiteSpace = "pre-wrap";
+        // 支持格式: 函数,初始值 或 仅函数
+        const reduceParams = param.split(",");
+        let reduceFunc, initialValue;
+
+        try {
+          if (reduceParams.length > 1) {
+            // 有初始值的情况 - 需要更智能地分割函数和初始值
+            let lastCommaIndex = -1;
+            let bracketCount = 0;
+
+            // 遍历字符串，找到最外层的逗号
+            for (let i = 0; i < param.length; i++) {
+              if (param[i] === "(") bracketCount++;
+              else if (param[i] === ")") bracketCount--;
+              else if (param[i] === "," && bracketCount === 0) {
+                lastCommaIndex = i;
+              }
+            }
+
+            if (lastCommaIndex !== -1) {
+              reduceFunc = param.substring(0, lastCommaIndex).trim();
+              initialValue = param.substring(lastCommaIndex + 1).trim();
+            } else {
+              // 如果没有找到合适的分隔逗号，使用简单分割
+              reduceFunc = reduceParams[0].trim();
+              initialValue = reduceParams.slice(1).join(",").trim();
+            }
+
+            // 设置默认函数
+            if (!reduceFunc) reduceFunc = "(acc, cur) => acc + cur";
+            if (!initialValue) initialValue = "0";
+
+            // 验证初始值格式
+            let parsedInitial;
+            try {
+              // 尝试解析为数字
+              if (!isNaN(initialValue) && initialValue.trim() !== "") {
+                parsedInitial = Number(initialValue);
+              } else {
+                // 检查是否是字符串（用引号包裹）
+                const trimmedValue = initialValue.trim();
+                if (
+                  (trimmedValue.startsWith('"') &&
+                    trimmedValue.endsWith('"')) ||
+                  (trimmedValue.startsWith("'") && trimmedValue.endsWith("'"))
+                ) {
+                  // 去掉引号
+                  parsedInitial = trimmedValue.slice(1, -1);
+                } else if (trimmedValue === "true") {
+                  parsedInitial = true;
+                } else if (trimmedValue === "false") {
+                  parsedInitial = false;
+                } else if (trimmedValue === "null") {
+                  parsedInitial = null;
+                } else if (trimmedValue === "undefined") {
+                  parsedInitial = undefined;
+                } else {
+                  // 如果不是有效的数字也不是有效的字符串格式，抛出错误
+                  throw new Error(
+                    `初始值格式不正确: "${initialValue}"。请使用数字或用引号包裹的字符串（如 "hello"）`
+                  );
+                }
+              }
+            } catch (initialError) {
+              // 在结果区域显示初始值错误
+              result.innerHTML = `<div style="color: red;">初始值错误: ${initialError.message}</div>
+                <div style="margin-top: 10px; color: #666;">正确示例:</div>
+                <ul style="color: #666; margin-left: 20px;">
+                    <li>数字: 0, 1, 100</li>
+                    <li>字符串: "hello", 'world'</li>
+                    <li>布尔值: true, false</li>
+                    <li>特殊值: null, undefined</li>
+                </ul>`;
+              codeExample.textContent = "";
+              explanation.textContent = "";
+              return; // 直接返回，不继续执行
+            }
+
+            // 创建函数
+            let reduceFunction;
+            try {
+              reduceFunction = new Function("return " + reduceFunc)();
+            } catch (funcError) {
+              // 如果直接解析失败，尝试用括号包裹
+              try {
+                reduceFunction = new Function("return (" + reduceFunc + ")")();
+              } catch {
+                result.innerHTML = `<div style="color: red;">函数格式错误: ${reduceFunc}</div>
+                    <div style="margin-top: 10px; color: #666;">正确示例:</div>
+                    <ul style="color: #666; margin-left: 20px;">
+                        <li>(acc, cur) => acc + cur</li>
+                        <li>(a, b) => a * b</li>
+                        <li>(sum, num) => sum + num</li>
+                    </ul>`;
+                codeExample.textContent = "";
+                explanation.textContent = "";
+                return;
+              }
+            }
+
+            returnValue = myArray.reduce(reduceFunction, parsedInitial);
+
+            codeText = `let arr = ${JSON.stringify(originalArrayCopy)};
+            let reduced = arr.reduce(${reduceFunc}, ${
+              typeof parsedInitial === "string"
+                ? `"${parsedInitial}"`
+                : parsedInitial
+            });
+          // reduced 是 ${JSON.stringify(returnValue)}
+          // 原数组 arr 保持不变: ${JSON.stringify(myArray)}`;
+          } else {
+            // 无初始值的情况
+            reduceFunc = param || "(acc, cur) => acc + cur";
+
+            // 创建函数
+            let reduceFunction;
+            try {
+              reduceFunction = new Function("return " + reduceFunc)();
+            } catch (funcError) {
+              // 如果直接解析失败，尝试用括号包裹
+              try {
+                reduceFunction = new Function("return (" + reduceFunc + ")")();
+              } catch {
+                result.innerHTML = `<div style="color: red;">函数格式错误: ${reduceFunc}</div>
+                    <div style="margin-top: 10px; color: #666;">正确示例:</div>
+                    <ul style="color: #666; margin-left: 20px;">
+                        <li>(acc, cur) => acc + cur</li>
+                        <li>(a, b) => a * b</li>
+                        <li>(sum, num) => sum + num</li>
+                    </ul>`;
+                codeExample.textContent = "";
+                explanation.textContent = "";
+                return;
+              }
+            }
+
+            returnValue = myArray.reduce(reduceFunction);
+
+            codeText = `let arr = ${JSON.stringify(originalArrayCopy)};
+          let reduced = arr.reduce(${reduceFunc});
+          // reduced 是 ${JSON.stringify(returnValue)}
+          // 原数组 arr 保持不变: ${JSON.stringify(myArray)}`;
+          }
+
+          newArray = [...myArray];
+          explanationText = `reduce() 方法对数组中的每个元素执行一个由您提供的reducer函数(升序执行)，将其结果汇总为单个返回值。`;
+          codeExample.style.whiteSpace = "pre-wrap";
+        } catch (error) {
+          result.innerHTML = `<div style="color: red;">reduce 参数解析错误: ${error.message}</div>`;
+          codeExample.textContent = "";
+          explanation.textContent = "";
+          return;
+        }
         break;
     }
 
@@ -370,6 +580,12 @@ function demonstrateCall() {
 
   callResult.innerHTML = `
     <p>使用 call() 方法在类数组对象上调用数组的 push 方法:</p>
+    <br>
+    <p>call() 方法改变 this 的指向让 push 方法在 arrayLike 对象上执行，而不是在真正的数组上</p>
+    <br>
+    <p style="color:red">详细解释：Array是一个构造函数，这个<a href='https://blog.csdn.net/2301_79691283/article/details/151725466?spm=1001.2014.3001.5502'>原型对象</a>有数组的所有方法，这里我们使用push方法。
+    同时，call()全写为：call(this.Arg,arg1,arg2...)。所以我们这里的this从之前指向Array.prototype（在原型链上）修改指向为arrayLike，且携带参数('c','d')并使用push方法添加进数组中</p>
+    <br>
     <p><div class="array-display">原类数组对象: {0: 'a', 1: 'b', length: 2}</div></p>
     <div class="array-display">调用 push('c', 'd') 后: ${JSON.stringify(
       arrayLike
@@ -383,6 +599,23 @@ function demonstrateCall() {
     let newLength = Array.prototype.push.call(arrayLike, 'c', 'd');
     arrayLike 现在是 {0: 'a', 1: 'b', 2: 'c', 3: 'd', length: 4}
     newLength 是 4
+
+    
+    // 使用call()修改this指向的例子
+    const person = {
+      name: 'Alice',
+      greet: function() {
+        console.log(Hello, I'm $ {this.name})
+      };
+    };
+    const anotherPerson = {
+      name: 'Bob'
+    };
+    // 正常调用
+    person.greet(); // "Hello, I'm Alice"
+
+    // 使用 call 改变 this 指向
+    person.greet.call(anotherPerson); // "Hello, I'm Bob"
   `;
   callCodeExample.style.whiteSpace = "pre-wrap";
 }
